@@ -1250,6 +1250,10 @@ impl CodegenAlternative {
                             let mut lock = total_text.lock();
                             lock.push_str(&text);
                         }
+                        Ok(LanguageModelCompletionEvent::Thinking { .. }) => {}
+                        Ok(LanguageModelCompletionEvent::RedactedThinking { .. }) => {}
+                        Ok(LanguageModelCompletionEvent::ReasoningDetails(_)) => {}
+                        Ok(LanguageModelCompletionEvent::Stop(_)) => {}
                         Ok(e) => {
                             log::warn!("Unexpected event: {:?}", e);
                             break;
@@ -1303,6 +1307,9 @@ impl CodegenAlternative {
                                 lock.push_str(&text);
                                 None
                             }
+                            Ok(LanguageModelCompletionEvent::Thinking { .. }) => None
+                            Ok(LanguageModelCompletionEvent::RedactedThinking { .. }) => None
+                            Ok(LanguageModelCompletionEvent::ReasoningDetails(_)) => None
                             Ok(LanguageModelCompletionEvent::Stop(_reason)) => None,
                             e => {
                                 log::error!("UNEXPECTED EVENT {:?}", e);
