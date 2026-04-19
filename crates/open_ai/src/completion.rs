@@ -373,12 +373,16 @@ fn add_message_content_part(
 
 pub struct OpenAiEventMapper {
     tool_calls_by_index: HashMap<usize, RawToolCall>,
+    in_thinking: bool,
+    pending_text: String,
 }
 
 impl OpenAiEventMapper {
     pub fn new() -> Self {
         Self {
             tool_calls_by_index: HashMap::default(),
+            in_thinking: false,
+            pending_text: String::new(),
         }
     }
 
@@ -424,7 +428,47 @@ impl OpenAiEventMapper {
             }
             if let Some(content) = delta.content.clone() {
                 if !content.is_empty() {
-                    events.push(Ok(LanguageModelCompletionEvent::Text(content)));
+                    let mut text = content.to_string();
+                    self.pending_text.push_str(&text);
+                    if self.in_thinking {
+                        if let Some(end) = self.pending_text.find("</think>") {
+                            if end + 8 < self.pending_text.len() {
+                                text = self.pending_text[end + 8..].to_string();
+                                text = text.trim_start().to_string();
+                            } else {
+                                text = String::new();
+                            }
+                            self.in_thinking = false;
+                            self.pending_text.clear();
+                            if !text.is_empty() {
+                                events.push(Ok(LanguageModelCompletionEvent::Text(text)));
+                            }
+                        }
+                    } else {
+                        if let Some(start) = self.pending_text.find("<think>") {
+                            if let Some(end) = self.pending_text.find("</think>") {
+                                if start > 0 {
+                                    text = self.pending_text[..start].to_string();
+                                    text = text.trim_start().to_string();
+                                } else if end + 8 < self.pending_text.len() {
+                                    text = self.pending_text[end + 8..].to_string();
+                                    text = text.trim_start().to_string();
+                                } else {
+                                    text = String::new();
+                                }
+                                self.pending_text.clear();
+                                if !text.is_empty() {
+                                    events.push(Ok(LanguageModelCompletionEvent::Text(text)));
+                                }
+                            } else {
+                                self.in_thinking = true;
+                                self.pending_text.clear();
+                            }
+                        } else {
+                            events.push(Ok(LanguageModelCompletionEvent::Text(text)));
+                            self.pending_text.clear();
+                        }
+                    }
                 }
             }
 
